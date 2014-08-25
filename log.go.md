@@ -5,6 +5,7 @@
 
 	import "fmt"
 	import "os"
+	import "strings"
 	import "time"
 
 Log output is routed through a channel to ensure messages from multiple threads
@@ -31,12 +32,12 @@ are not interleaved, the written to STDOUT or STDERR depending on the severity.
 		logChannel <- logMessage {
 			timestamp: time.Now(),
 			severity: severity,
-			message: message,
+			message: strings.TrimSpace(message),
 		}
 	}
 
 	func logDebug(msgs...interface{}) {
-		log(debug, fmt.Sprint(msgs...))
+		log(debug, fmt.Sprintln(msgs...))
 	}
 
 	func logDebugf(format string, args...interface{}) {
@@ -44,7 +45,7 @@ are not interleaved, the written to STDOUT or STDERR depending on the severity.
 	}
 
 	func logInfo(msgs...interface{}) {
-		log(info, fmt.Sprint(msgs...))
+		log(info, fmt.Sprintln(msgs...))
 	}
 
 	func logInfof(format string, args...interface{}) {
@@ -52,7 +53,7 @@ are not interleaved, the written to STDOUT or STDERR depending on the severity.
 	}
 
 	func logWarn(msgs...interface{}) {
-		log(warn, fmt.Sprint(msgs...))
+		log(warn, fmt.Sprintln(msgs...))
 	}
 
 	func logWarnf(format string, args...interface{}) {
@@ -60,7 +61,7 @@ are not interleaved, the written to STDOUT or STDERR depending on the severity.
 	}
 
 	func logError(msgs...interface{}) {
-		log(error, fmt.Sprint(msgs...))
+		log(error, fmt.Sprintln(msgs...))
 	}
 
 	func logErrorf(format string, args...interface{}) {
@@ -68,7 +69,7 @@ are not interleaved, the written to STDOUT or STDERR depending on the severity.
 	}
 
 	func logFatal(msgs...interface{}) {
-		log(fatal, fmt.Sprint(msgs...))
+		log(fatal, fmt.Sprintln(msgs...))
 	}
 
 	func logFatalf(format string, args...interface{}) {

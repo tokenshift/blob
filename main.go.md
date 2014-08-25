@@ -8,6 +8,7 @@ line, and starts running a **Blob** node.
 
 	import "fmt"
 	import "os"
+	import "time"
 
 	import "github.com/tokenshift/env"
 
@@ -19,6 +20,8 @@ to the running node.
 
 	const envDataFolderKey = "BLOB_DATA_FOLDER"
 	var envDataFolder string
+
+	var port = 3103
 
 ## Entry Point
 
@@ -37,9 +40,12 @@ to the running node.
 			fatalError(envDataFolder, "is not a folder.")
 		}
 
-The logger is started first:
-
 		go runLogger()
+		go requestHandler()
+
+		for {
+			time.Sleep(1 * time.Second)
+		}
 	}
 
 	<<#-->>
