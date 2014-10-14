@@ -55,6 +55,18 @@ func (r Responder) Handle(res http.ResponseWriter, req *http.Request) {
 	switch(req.Method) {
 	case "GET":
 		// Retrieve an existing file.
+		r.handleGet(res, path)
+	case "PUT":
+		// Create or update a file.
+	case "DELETE":
+		// Delete a file.
+	default:
+		LogInfo(r, "Unsupported request method:", req.Method)
+		res.WriteHeader(400)
+	}
+}
+
+func (r Responder) handleGet(res http.ResponseWriter, path string) {
 		fs, err := os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -82,12 +94,4 @@ func (r Responder) Handle(res http.ResponseWriter, req *http.Request) {
 		LogInfo(r, "Content-Length:", fs.Size())
 		res.Header()["Content-Length"] = []string{fmt.Sprint(fs.Size())}
 		io.Copy(res, f)
-	case "PUT":
-		// Create or update a file.
-	case "DELETE":
-		// Delete a file.
-	default:
-		LogInfo(r, "Unsupported request method:", req.Method)
-		res.WriteHeader(400)
-	}
 }
