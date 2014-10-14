@@ -16,15 +16,18 @@ func isValidPath(path string) {
 }
 
 func handleRequest(res http.ResponseWriter, req *http.Request) {
+	logInfo(req.Method, req.URL)
+
 	path := strings.ToLower(req.URL.Path)
-	fmt.Println(path)
 	if !rxValidPath.MatchString(path) {
+		logInfo("Invalid path:", path)
 		res.WriteHeader(400)
 		return
 	}
 
 	path, err := filepath.Abs(filepath.Join("data", path))
 	if err != nil {
+		logError("Failed to construct local file path:", err)
 		res.WriteHeader(500)
 		return
 	}
@@ -35,8 +38,10 @@ func handleRequest(res http.ResponseWriter, req *http.Request) {
 		fs, err := os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
+				logInfo("File not found:", path)
 				res.WriteHeader(404)
 			} else {
+				logError("Failed to open file:", path, err)
 				res.WriteHeader(500)
 			}
 			return
@@ -45,13 +50,16 @@ func handleRequest(res http.ResponseWriter, req *http.Request) {
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
+				logInfo("File not found:", path)
 				res.WriteHeader(404)
 			} else {
+				logError("Failed to open file:", path, err)
 				res.WriteHeader(500)
 			}
 			return
 		}
 
+		logInfo("Content-Length:", fs.Size())
 		res.Header()["Content-Length"] = []string{fmt.Sprint(fs.Size())}
 		io.Copy(res, f)
 	case "PUT":
@@ -59,6 +67,7 @@ func handleRequest(res http.ResponseWriter, req *http.Request) {
 	case "DELETE":
 		// Delete a file.
 	default:
+		logInfo("Unsupported request method:", req.Method)
 		res.WriteHeader(400)
 	}
 }
