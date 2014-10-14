@@ -1,6 +1,4 @@
-# Generated source files
-*.go
-
 # Compiled executable
 blob
 blob.exe
+data/
