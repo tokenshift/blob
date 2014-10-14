@@ -4,19 +4,23 @@ import (
 	"fmt"
 )
 
-func log(level string, args...interface{}) {
-	args = append([]interface{}{fmt.Sprintf("%s:", level)}, args...)
+type HasID interface {
+	ID() int
+}
+
+func log(ctx HasID, level string, args...interface{}) {
+	args = append([]interface{}{fmt.Sprintf("%8x %s:", ctx.ID(), level)}, args...)
 	fmt.Println(args...)
 }
 
-func logError(args...interface{}) {
-	log("ERROR", args...)
+func LogError(ctx HasID, args...interface{}) {
+	log(ctx, "ERROR", args...)
 }
 
-func logInfo(args...interface{}) {
-	log("INFO", args...)
+func LogInfo(ctx HasID, args...interface{}) {
+	log(ctx, "INFO", args...)
 }
 
-func logWarn(args...interface{}) {
-	log("WARN", args...)
+func LogWarn(ctx HasID, args...interface{}) {
+	log(ctx, "WARN", args...)
 }

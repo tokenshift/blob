@@ -7,5 +7,5 @@ import (
 
 func main() {
 	port := fmt.Sprintf(":%s", GetEnvOr("PORT", "3000"))
-	http.ListenAndServe(port, Responder{})
+	http.ListenAndServe(port, http.HandlerFunc(handleRequest))
 }

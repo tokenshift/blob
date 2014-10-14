@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,24 +12,42 @@ import (
 )
 
 type Responder struct {
-	http.Handler
+	id int
+}
+
+func NewResponder() Responder {
+	return Responder {
+		id: rand.Int() % 0xffffffff,
+	}
+}
+
+func (r Responder) ID() int {
+	return r.id
 }
 
 var rxValidPath = regexp.MustCompile(`^[\/0-9a-z \-_',]+(\.[a-z0-9]+)?$`)
 
-func (r Responder) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	logInfo(req.Method, req.URL)
+func isValidPath(path string) bool {
+	return rxValidPath.MatchString(path)
+}
+
+func handleRequest(res http.ResponseWriter, req *http.Request) {
+	NewResponder().Handle(res, req)
+}
+
+func (r Responder) Handle(res http.ResponseWriter, req *http.Request) {
+	LogInfo(r, req.Method, req.URL)
 
 	path := strings.ToLower(req.URL.Path)
-	if !rxValidPath.MatchString(path) {
-		logInfo("Invalid path:", path)
+	if !isValidPath(path) {
+		LogInfo(r, "Invalid path:", path)
 		res.WriteHeader(400)
 		return
 	}
 
 	path, err := filepath.Abs(filepath.Join("data", path))
 	if err != nil {
-		logError("Failed to construct local file path:", err)
+		LogError(r, "Failed to construct local file path:", err)
 		res.WriteHeader(500)
 		return
 	}
@@ -39,10 +58,10 @@ func (r Responder) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		fs, err := os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				logInfo("File not found:", path)
+				LogInfo(r, "File not found:", path)
 				res.WriteHeader(404)
 			} else {
-				logError("Failed to open file:", path, err)
+				LogError(r, "Failed to open file:", path, err)
 				res.WriteHeader(500)
 			}
 			return
@@ -51,16 +70,16 @@ func (r Responder) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				logInfo("File not found:", path)
+				LogInfo(r, "File not found:", path)
 				res.WriteHeader(404)
 			} else {
-				logError("Failed to open file:", path, err)
+				LogError(r, "Failed to open file:", path, err)
 				res.WriteHeader(500)
 			}
 			return
 		}
 
-		logInfo("Content-Length:", fs.Size())
+		LogInfo(r, "Content-Length:", fs.Size())
 		res.Header()["Content-Length"] = []string{fmt.Sprint(fs.Size())}
 		io.Copy(res, f)
 	case "PUT":
@@ -68,8 +87,7 @@ func (r Responder) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	case "DELETE":
 		// Delete a file.
 	default:
-		logInfo("Unsupported request method:", req.Method)
+		LogInfo(r, "Unsupported request method:", req.Method)
 		res.WriteHeader(400)
 	}
 }
-
