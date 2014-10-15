@@ -5,7 +5,6 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -69,55 +68,41 @@ func (r Responder) Handle(res http.ResponseWriter, req *http.Request) {
 }
 
 func (r Responder) handleGet(res http.ResponseWriter, path string) {
-		fs, err := os.Stat(path)
+	entry, ok := ManifestGet(path)
+	if ok {
+		res.Header()["Content-Length"] = []string{fmt.Sprint(entry.Size)}
+		res.Header()["Content-Type"] = []string{entry.MimeType}
+		data, err := entry.Open()
 		if err != nil {
-			if os.IsNotExist(err) {
-				LogInfo(r, "File not found:", path)
-				res.WriteHeader(404)
-			} else {
-				LogError(r, "Failed to open file:", path, err)
-				res.WriteHeader(500)
-			}
-			return
+			LogError(r, err)
+			res.WriteHeader(500)
 		}
-
-		f, err := os.Open(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				LogInfo(r, "File not found:", path)
-				res.WriteHeader(404)
-			} else {
-				LogError(r, "Failed to open file:", path, err)
-				res.WriteHeader(500)
-			}
-			return
-		}
-
-		LogInfo(r, "Content-Length:", fs.Size())
-		res.Header()["Content-Length"] = []string{fmt.Sprint(fs.Size())}
-		io.Copy(res, f)
+		io.Copy(res, data)
+	} else {
+		LogInfo(r, "File not found:", path)
+		res.WriteHeader(404)
+	}
 }
 
 func (r Responder) handleDelete(res http.ResponseWriter, path string) {
-	err := os.Remove(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			LogInfo(r, "File not found:", path)
-			res.WriteHeader(404)
-		} else {
-			LogError(r, "Failed to delete file:", path, err)
-			res.WriteHeader(500)
-		}
+	if _, ok := ManifestGet(path); ok {
+		ManifestDelete(path)
+	} else {
+		res.WriteHeader(404)
 	}
 }
 
 func (r Responder) handlePut(res http.ResponseWriter, req *http.Request, path string) {
-	f, err := os.Create(path)
+	mimeType := ""
+	mimeTypes := req.Header["Content-Type"]
+	if len(mimeTypes) == 1 {
+		mimeType = mimeTypes[0]
+	}
+
+	_, err := ManifestPut(path, mimeType, req.Body)
 	if err != nil {
 		LogError(r, err)
 		res.WriteHeader(500)
 		return
 	}
-
-	io.Copy(f, req.Body)
 }
