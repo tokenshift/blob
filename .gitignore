@@ -2,7 +2,11 @@
 blob
 blob.exe
 
+# Generated code
+*.go
+
 # Local Data
 data/
 *.jpg
 *.jpg.*
+*.sqlite3
