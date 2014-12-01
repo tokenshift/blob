@@ -3,10 +3,11 @@
 Utility functions for working with environment variables.
 
 	<<#-->>
-	package main
+	package env
 
 	import (
 		"os"
+		"strconv"
 		"strings"
 	)
 
@@ -19,7 +20,7 @@ order to retrieve specific variables by key, the input string is split on the
 	}
 
 
-	func Env() (<- chan KeyVal) {
+	func All() (<- chan KeyVal) {
 		out := make(chan KeyVal)
 
 		go func() {
@@ -35,12 +36,12 @@ order to retrieve specific variables by key, the input string is split on the
 		return out
 	}
 
-GetEnv returns the requested variable and a bool indicating whether it was set;
-GetEnvOr lets the consumer specify a default value to use if the variable was
+Get returns the requested variable and a bool indicating whether it was set;
+GetOr lets the consumer specify a default value to use if the variable was
 not set.
 
-	func GetEnv(key string) (string, bool) {
-		for kv := range(Env()) {
+	func Get(key string) (string, bool) {
+		for kv := range(All()) {
 			if kv.Key == key {
 				return kv.Val, true
 			}
@@ -49,11 +50,20 @@ not set.
 		return "", false
 	}
 
-	func GetEnvOr(key, alt string) string {
-		if val, ok := GetEnv(key); ok {
+	func GetOr(key, alt string) string {
+		if val, ok := Get(key); ok {
 			return val
 		} else {
 			return alt
+		}
+	}
+
+	func GetInt(key string) (int, bool, error) {
+		if val, ok := Get(key); ok {
+			i, err := strconv.ParseInt(val, 0, 0)
+			return int(i), true, err
+		} else {
+			return -1, false, nil
 		}
 	}
 
@@ -62,8 +72,8 @@ the ':' character (e.g. $PATH). Colons can be escaped with a forward slash to
 avoid using them as delimiters, if they need to be included in a value; for
 example: HOSTS=localhost\:3000:example.com
 
-	func GetEnvList(key string) ([]string, bool) {
-		if val, ok := GetEnv(key); ok {
+	func GetList(key string) ([]string, bool) {
+		if val, ok := Get(key); ok {
 			return splitEnvList(val), true
 		} else {
 			return nil, false

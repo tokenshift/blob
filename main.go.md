@@ -1,17 +1,46 @@
 # Blob
 
 	<<#-->>
-
 	package main
 
 	import (
-		"fmt"
-		"net/http"
+		"os"
+
+		"github.com/tokenshift/blob/env"
+		"github.com/tokenshift/blob/log"
+		. "github.com/tokenshift/blob/manifest"
+		. "github.com/tokenshift/blob/rest"
 	)
 
-Starts a **Blob** node on the configured port.
+Main entry point for a **Blob** node. Loads configuration settings and starts
+the node.
 
 	func main() {
-		port := fmt.Sprintf(":%s", GetEnvOr("PORT", "3000"))
-		http.ListenAndServe(port, http.HandlerFunc(handleRequest))
+		dbFile, ok := env.Get("MANIFEST_DB_FILE")
+		if !ok {
+			log.Fatal("Missing $MANIFEST_DB_FILE")
+			os.Exit(1)
+		}
+
+		storeDir, ok := env.Get("MANIFEST_STORE_DIR")
+		if !ok {
+			log.Fatal("Missing $MANIFEST_STORE_DIR")
+			os.Exit(1)
+		}
+
+		manifest := CreateManifest(dbFile, storeDir)
+
+		restHandler := CreateRestHandler(manifest)
+
+		port, ok, err := env.GetInt("REST_PORT")
+		if !ok {
+			log.Fatal("Missing $REST_PORT")
+			os.Exit(1)
+		}
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+
+		restHandler.Serve(port)
 	}
