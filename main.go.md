@@ -28,7 +28,13 @@ the node.
 			os.Exit(1)
 		}
 
-		manifest := CreateManifest(dbFile, storeDir)
+		manifest, err := CreateManifest(dbFile, storeDir)
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+
+		defer manifest.Close()
 
 		restHandler := CreateRestHandler(manifest)
 
