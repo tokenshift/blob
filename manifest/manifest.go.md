@@ -131,3 +131,23 @@ Put returns true if the file was newly created, or false if it already existed
 
 		return isNew, err
 	}
+
+Delete returns true if the file existed and was removed.
+
+	func (m Manifest) Delete(fname string) (bool, error) {
+		var err error
+		var exists bool
+
+		m.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(bucketName))
+
+			exists = b.Get([]byte(fname)) != nil
+			if exists {
+				err = b.Delete([]byte(fname))
+			}
+
+			return err
+		})
+
+		return exists, err
+	}

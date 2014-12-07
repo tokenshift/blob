@@ -82,7 +82,10 @@ GET requests retrieve an existing file.
 			return
 		}
 
-		if !exists {
+		if exists {
+			log.Debug("Retrieved", path)
+		} else {
+			log.Debug(path, "does not exist")
 			res.WriteHeader(404)
 		}
 	}
@@ -101,8 +104,10 @@ PUT requests store a new file or update an existing file.
 		}
 
 		if isNew {
+			log.Debug("Created new file", path)
 			res.WriteHeader(201)
 		} else {
+			log.Debug("Updated existing file", path)
 			res.WriteHeader(200)
 		}
 	}
@@ -110,5 +115,21 @@ PUT requests store a new file or update an existing file.
 DELETE requests remove a file from the node.
 
 	func (h Handler) handleDelete(res http.ResponseWriter, req *http.Request) {
-		res.WriteHeader(200)
+		path := req.URL.Path
+
+		deleted, err := h.manifest.Delete(path)
+		if err != nil {
+			log.Error(err)
+			res.WriteHeader(500)
+			res.Write([]byte("An unknown eror occurred."))
+			return
+		}
+
+		if deleted {
+			log.Debug(path, "was deleted")
+			res.WriteHeader(200)
+		} else {
+			log.Debug(path, "was not found")
+			res.WriteHeader(404)
+		}
 	}
