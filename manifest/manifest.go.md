@@ -73,8 +73,18 @@ Put returns true if the file was newly created, or false if it already existed
 
 		log.Debug("Saving", fname, "as", id, "at", path)
 
+		file, err := os.Create(path)
+		if err != nil {
+			return false, err
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, data)
+		if err != nil {
+			return false, err
+		}
+
 		var isNew bool
-		var err error
 
 		m.db.Update(func(tx *bolt.Tx) error {
 			b, err := tx.CreateBucketIfNotExists([]byte(bucketName))
