@@ -44,6 +44,11 @@ Stores files and file metadata.
 			return Manifest{}, err
 		}
 
+		db.Update(func(tx *bolt.Tx) error {
+			_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
+			return err
+		})
+
 		return Manifest {
 			dbFile: dbFile,
 			storeDir: storeDir,
@@ -63,6 +68,37 @@ manifest only being updated once the write is complete.
 File metadata is stored in a Bolt DB.
 
 	const bucketName = "Files"
+
+Get returns true if the file exists, and writes the file to the specified
+output stream.
+
+	func (m Manifest) Get(fname string, out io.Writer) (bool, error) {
+		path := ""
+
+		m.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(bucketName))
+			id := b.Get([]byte(fname))
+
+			if id != nil {
+				path = filepath.Join(m.storeDir, string(id))
+			}
+
+			return nil
+		})
+
+		if path == "" {
+			return false, nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return true, err
+		}
+		defer file.Close()
+
+		_, err = io.Copy(out, file)
+		return true, err
+	}
 
 Put returns true if the file was newly created, or false if it already existed
 (and was updated).
@@ -87,13 +123,8 @@ Put returns true if the file was newly created, or false if it already existed
 		var isNew bool
 
 		m.db.Update(func(tx *bolt.Tx) error {
-			b, err := tx.CreateBucketIfNotExists([]byte(bucketName))
-			if err != nil {
-				return err
-			}
-		
+			b := tx.Bucket([]byte(bucketName))
 			isNew = b.Get([]byte(fname)) == nil
-
 			err = b.Put([]byte(fname), []byte(id))
 			return err
 		})

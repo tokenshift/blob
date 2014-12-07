@@ -72,7 +72,19 @@ Only a restricted subset of possible filenames is supported.
 GET requests retrieve an existing file.
 
 	func (h Handler) handleGet(res http.ResponseWriter, req *http.Request) {
-		res.WriteHeader(200)
+		path := req.URL.Path
+
+		exists, err := h.manifest.Get(path, res)
+		if err != nil {
+			log.Error(err)
+			res.Write([]byte("An unknown error occurred."))
+			res.WriteHeader(500)
+			return
+		}
+
+		if !exists {
+			res.WriteHeader(404)
+		}
 	}
 
 PUT requests store a new file or update an existing file.
