@@ -4,6 +4,7 @@
 	package manifest
 
 	import (
+		"encoding/binary"
 		"fmt"
 		"io"
 		"os"
@@ -20,6 +21,12 @@ Stores files and file metadata.
 	type Manifest struct {
 		dbFile, storeDir string
 		db *bolt.DB
+	}
+
+	type File struct {
+		id string
+		Name string
+		Size int64
 	}
 
 	func CreateManifest(dbFile, storeDir string) (Manifest, error) {
@@ -65,7 +72,14 @@ collisions when a file is being updated at the same time as it is being read;
 the update will write data to a new file (with a different UUID), with the
 manifest only being updated once the write is complete.
 
-File metadata is stored in a Bolt DB.
+File metadata is stored in a Bolt DB. The filename itself is is used as a key
+where an internal ID for the file (a UUID) is saved. While the same filename
+may refer to multiple versions of a file (a Get request will retrieve whatever
+the latest version happens to be), the ID refers to a specific version. The ID
+also becomes part of the file location on disk.
+
+All other file metadata is stored at keys consisting of the ID with an
+additional suffix of the name of the metadata field (e.g. `{id}size`).
 
 	const bucketName = "Files"
 
@@ -80,7 +94,7 @@ output stream.
 			id := b.Get([]byte(fname))
 
 			if id != nil {
-				path = filepath.Join(m.storeDir, string(id))
+				path = filepath.Join(m.storeDir, uuid.UUID(id).String())
 			}
 
 			return nil
@@ -104,8 +118,8 @@ Put returns true if the file was newly created, or false if it already existed
 (and was updated).
 
 	func (m Manifest) Put(fname string, data io.Reader) (bool, error) {
-		id := uuid.NewUUID().String()
-		path := filepath.Join(m.storeDir, id)
+		id := uuid.NewRandom()
+		path := filepath.Join(m.storeDir, id.String())
 
 		log.Debug("Saving", fname, "as", id, "at", path)
 
@@ -115,7 +129,7 @@ Put returns true if the file was newly created, or false if it already existed
 		}
 		defer file.Close()
 
-		_, err = io.Copy(file, data)
+		size, err := io.Copy(file, data)
 		if err != nil {
 			return false, err
 		}
@@ -123,9 +137,20 @@ Put returns true if the file was newly created, or false if it already existed
 		var isNew bool
 
 		m.db.Update(func(tx *bolt.Tx) error {
+			sizeKey := append(id, []byte("size")...)
+			sizeBuf := make([]byte, 8)
+			binary.PutVarint(sizeBuf, size)
+
 			b := tx.Bucket([]byte(bucketName))
 			isNew = b.Get([]byte(fname)) == nil
-			err = b.Put([]byte(fname), []byte(id))
+			
+			err = b.Put([]byte(fname), id)
+			if err != nil {
+				return err
+			}
+			
+			err = b.Put(sizeKey, sizeBuf)
+
 			return err
 		})
 

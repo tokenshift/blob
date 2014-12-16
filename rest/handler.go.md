@@ -77,8 +77,8 @@ GET requests retrieve an existing file.
 		exists, err := h.manifest.Get(path, res)
 		if err != nil {
 			log.Error(err)
-			res.Write([]byte("An unknown error occurred."))
 			res.WriteHeader(500)
+			res.Write([]byte("An unknown error occurred."))
 			return
 		}
 
