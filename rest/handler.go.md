@@ -78,7 +78,15 @@ GET requests retrieve an existing file.
 
 		if exists {
 			log.Debug("Retrieving", path)
-			res.Header()["Content-Length"] = []string{fmt.Sprint(info.Size)}
+
+			if info.Size > 0 {
+				res.Header()["Content-Length"] = []string{fmt.Sprint(info.Size)}
+			}
+
+			if info.MimeType != "" {
+				res.Header()["Content-Type"] = []string{info.MimeType}
+			}
+
 			err := info.WriteTo(res)
 			if err != nil {
 				log.Error(err)

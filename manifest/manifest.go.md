@@ -123,6 +123,11 @@ Get returns true if the file exists, and provides a handle to the file metadata
 				info.Size, _ = binary.Varint(size)
 			}
 
+			mimeType := b.Get(bucketKey(id, "mime"))
+			if mimeType != nil {
+				info.MimeType = string(mimeType)
+			}
+
 			return nil
 		})
 
