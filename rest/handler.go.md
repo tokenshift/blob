@@ -50,6 +50,8 @@ files.
 		switch req.Method {
 		case "GET":
 			h.handleGet(res, req)
+		case "HEAD":
+			h.handleHead(res, req)
 		case "PUT":
 			h.handlePut(res, req)
 		case "DELETE":
@@ -95,6 +97,35 @@ GET requests retrieve an existing file.
 			if err != nil {
 				log.Error(err)
 			}
+		} else {
+			log.Debug(path, "does not exist")
+			res.WriteHeader(404)
+		}
+	}
+
+HEAD requests retrieve metadata for an existing file.
+
+	func (h Handler) handleHead(res http.ResponseWriter, req *http.Request) {
+		path := req.URL.Path
+
+		exists, info := h.manifest.Get(path)
+
+		if exists {
+			log.Debug("Retrieving metadata for", path)
+
+			if info.Size > 0 {
+				res.Header()["Content-Length"] = []string{fmt.Sprint(info.Size)}
+			}
+
+			if info.MimeType != "" {
+				res.Header()["Content-Type"] = []string{info.MimeType}
+			}
+
+			if info.Hash != nil {
+				res.Header()["ETag"] = []string{fmt.Sprintf("%x", info.Hash)}
+			}
+
+			res.WriteHeader(200)
 		} else {
 			log.Debug(path, "does not exist")
 			res.WriteHeader(404)
