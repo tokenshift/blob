@@ -74,16 +74,15 @@ GET requests retrieve an existing file.
 	func (h Handler) handleGet(res http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
-		exists, err := h.manifest.Get(path, res)
-		if err != nil {
-			log.Error(err)
-			res.WriteHeader(500)
-			res.Write([]byte("An unknown error occurred."))
-			return
-		}
+		exists, info := h.manifest.Get(path)
 
 		if exists {
-			log.Debug("Retrieved", path)
+			log.Debug("Retrieving", path)
+			res.Header()["Content-Length"] = []string{fmt.Sprint(info.Size)}
+			err := info.WriteTo(res)
+			if err != nil {
+				log.Error(err)
+			}
 		} else {
 			log.Debug(path, "does not exist")
 			res.WriteHeader(404)

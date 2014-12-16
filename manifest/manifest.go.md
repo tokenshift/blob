@@ -25,9 +25,13 @@ Stores files and file metadata.
 	}
 
 	type File struct {
-		id string
+		id []byte
+		path string
+
 		Name string
+		MimeType string
 		Size int64
+		Hash []byte
 	}
 
 	func CreateManifest(dbFile, storeDir string) (Manifest, error) {
@@ -82,37 +86,58 @@ also becomes part of the file location on disk.
 All other file metadata is stored at keys consisting of the ID with an
 additional suffix of the name of the metadata field (e.g. `{id}size`).
 
-	const bucketName = "Files"
+	var bucketName = []byte("Files")
 
-Get returns true if the file exists, and writes the file to the specified
-output stream.
+	func bucketKey(id []byte, key string) []byte {
+		// Not sure why a copy is needed here; if I try to append to `id`
+		// directly, I'm getting runtime panics from memmove_amd64.s.
+		result := make([]byte, len(id), len(id) + len(key))
+		copy(result, id)
+		result = append(result, []byte(key)...)
+		return result
+	}
 
-	func (m Manifest) Get(fname string, out io.Writer) (bool, error) {
-		path := ""
+Get returns true if the file exists, and provides a handle to the file metadata
+(that can also be used to access the file data).
+
+	func (m Manifest) Get(fname string) (bool, File) {
+		exists := false
+		info := File{
+			Name: fname,
+		}
 
 		m.db.View(func(tx *bolt.Tx) error {
 			b := tx.Bucket([]byte(bucketName))
 			id := b.Get([]byte(fname))
 
-			if id != nil {
-				path = filepath.Join(m.storeDir, uuid.UUID(id).String())
+			exists = id != nil
+			if !exists {
+				return nil
+			}
+
+			info.id = id
+			info.path = filepath.Join(m.storeDir, uuid.UUID(id).String())
+
+			size := b.Get(bucketKey(id, "size"))
+			if size != nil {
+				info.Size, _ = binary.Varint(size)
 			}
 
 			return nil
 		})
 
-		if path == "" {
-			return false, nil
-		}
+		return exists, info
+	}
 
-		file, err := os.Open(path)
+	func (f File) WriteTo(out io.Writer) error {
+		in, err := os.Open(f.path)
 		if err != nil {
-			return true, err
+			return err
 		}
-		defer file.Close()
+		defer in.Close()
 
-		_, err = io.Copy(out, file)
-		return true, err
+		_, err = io.Copy(out, in)
+		return err
 	}
 
 Put returns true if the file was newly created, or false if it already existed
@@ -144,32 +169,28 @@ the file size are both recorded as metadata.
 		var isNew bool
 
 		m.db.Update(func(tx *bolt.Tx) error {
-			hashKey := append(id, []byte("hash")...)
-			mimeKey := append(id, []byte("mime")...)
-			sizeKey := append(id, []byte("size")...)
-
 			sizeBuf := make([]byte, 8)
 			binary.PutVarint(sizeBuf, size)
 
 			b := tx.Bucket([]byte(bucketName))
 			isNew = b.Get([]byte(fname)) == nil
-			
+
 			err = b.Put([]byte(fname), id)
 			if err != nil {
 				return err
 			}
-			
-			err = b.Put(sizeKey, sizeBuf)
+
+			err = b.Put(bucketKey(id, "size"), sizeBuf)
 			if err != nil {
 				return err
 			}
 
-			err = b.Put(hashKey, hash.Sum(nil))
+			err = b.Put(bucketKey(id, "hash"), hash.Sum(nil))
 			if err != nil {
 				return err
 			}
-			
-			err = b.Put(mimeKey, []byte(mimeType))
+
+			err = b.Put(bucketKey(id, "mime"), []byte(mimeType))
 			return err
 		})
 
