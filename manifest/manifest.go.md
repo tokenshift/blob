@@ -118,7 +118,7 @@ output stream.
 Put returns true if the file was newly created, or false if it already existed
 (and was updated).
 
-	func (m Manifest) Put(fname string, data io.Reader) (bool, error) {
+	func (m Manifest) Put(fname, mimeType string, data io.Reader) (bool, error) {
 		id := uuid.NewRandom()
 		path := filepath.Join(m.storeDir, id.String())
 
@@ -145,6 +145,7 @@ the file size are both recorded as metadata.
 
 		m.db.Update(func(tx *bolt.Tx) error {
 			hashKey := append(id, []byte("hash")...)
+			mimeKey := append(id, []byte("mime")...)
 			sizeKey := append(id, []byte("size")...)
 
 			sizeBuf := make([]byte, 8)
@@ -164,6 +165,11 @@ the file size are both recorded as metadata.
 			}
 
 			err = b.Put(hashKey, hash.Sum(nil))
+			if err != nil {
+				return err
+			}
+			
+			err = b.Put(mimeKey, []byte(mimeType))
 			return err
 		})
 

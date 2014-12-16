@@ -95,7 +95,13 @@ PUT requests store a new file or update an existing file.
 	func (h Handler) handlePut(res http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
-		isNew, err := h.manifest.Put(path, req.Body)
+		mimeType := ""
+		mimeTypes := req.Header["Content-Type"]
+		if len(mimeTypes) > 0 {
+			mimeType = mimeTypes[0]
+		}
+
+		isNew, err := h.manifest.Put(path, mimeType, req.Body)
 		if err != nil {
 			log.Error(err)
 			res.WriteHeader(500)
