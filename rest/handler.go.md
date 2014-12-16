@@ -87,6 +87,10 @@ GET requests retrieve an existing file.
 				res.Header()["Content-Type"] = []string{info.MimeType}
 			}
 
+			if info.Hash != nil {
+				res.Header()["ETag"] = []string{fmt.Sprintf("%x", info.Hash)}
+			}
+
 			err := info.WriteTo(res)
 			if err != nil {
 				log.Error(err)

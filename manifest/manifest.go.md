@@ -128,6 +128,11 @@ Get returns true if the file exists, and provides a handle to the file metadata
 				info.MimeType = string(mimeType)
 			}
 
+			hash := b.Get(bucketKey(id, "hash"))
+			if hash != nil {
+				info.Hash = hash
+			}
+
 			return nil
 		})
 
