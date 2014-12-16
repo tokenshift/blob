@@ -14,6 +14,7 @@
 
 		"code.google.com/p/go-uuid/uuid"
 		"github.com/boltdb/bolt"
+		"github.com/spaolacci/murmur3"
 	)
 
 Stores files and file metadata.
@@ -129,7 +130,13 @@ Put returns true if the file was newly created, or false if it already existed
 		}
 		defer file.Close()
 
-		size, err := io.Copy(file, data)
+The input data is tee'd to a rolling hash and the file on disk. The hash and
+the file size are both recorded as metadata.
+
+		hash := murmur3.New128()
+		input := io.TeeReader(data, hash)
+
+		size, err := io.Copy(file, input)
 		if err != nil {
 			return false, err
 		}
@@ -137,7 +144,9 @@ Put returns true if the file was newly created, or false if it already existed
 		var isNew bool
 
 		m.db.Update(func(tx *bolt.Tx) error {
+			hashKey := append(id, []byte("hash")...)
 			sizeKey := append(id, []byte("size")...)
+
 			sizeBuf := make([]byte, 8)
 			binary.PutVarint(sizeBuf, size)
 
@@ -150,7 +159,11 @@ Put returns true if the file was newly created, or false if it already existed
 			}
 			
 			err = b.Put(sizeKey, sizeBuf)
+			if err != nil {
+				return err
+			}
 
+			err = b.Put(hashKey, hash.Sum(nil))
 			return err
 		})
 
