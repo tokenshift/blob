@@ -8,12 +8,14 @@
 
 		"github.com/tokenshift/blob/env"
 		"github.com/tokenshift/blob/log"
+
+		. "github.com/tokenshift/blob/admin"
 		. "github.com/tokenshift/blob/manifest"
 		. "github.com/tokenshift/blob/rest"
 	)
 
-Main entry point for a **Blob** node. Loads configuration settings and starts
-the node.
+The main entry point for a **Blob** node. All settings are configured by
+environment variables.
 
 	func main() {
 		dbFile, ok := env.Get("MANIFEST_DB_FILE")
@@ -28,17 +30,19 @@ the node.
 			os.Exit(1)
 		}
 
-		manifest, err := CreateManifest(dbFile, storeDir)
-		if err != nil {
-			log.Fatal(err)
+		adminUsername, ok := env.Get("ADMIN_USERNAME")
+		if !ok {
+			log.Fatal("Missing $ADMIN_USERNAME")
 			os.Exit(1)
 		}
 
-		defer manifest.Close()
+		adminPasshash, ok := env.Get("ADMIN_PASSHASH")
+		if !ok {
+			log.Fatal("Missing $ADMIN_USERNAME")
+			os.Exit(1)
+		}
 
-		restHandler := CreateRestHandler(manifest)
-
-		port, ok, err := env.GetInt("REST_PORT")
+		restPort, ok, err := env.GetInt("REST_PORT")
 		if !ok {
 			log.Fatal("Missing $REST_PORT")
 			os.Exit(1)
@@ -48,5 +52,43 @@ the node.
 			os.Exit(1)
 		}
 
-		restHandler.Serve(port)
+		adminPort, ok, err := env.GetInt("ADMIN_PORT")
+		if !ok {
+			log.Fatal("Missing $ADMIN_PORT")
+			os.Exit(1)
+		}
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+
+Once all settings have been validated, the individual components are
+initialized and started.
+
+		manifest, err := CreateManifest(dbFile, storeDir)
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+
+		defer manifest.Close()
+
+		adminInterface := CreateAdminInterface(adminUsername, adminPasshash)
+
+		restHandler := CreateRestHandler(manifest)
+
+		adminWait := make(chan struct{})
+		go func() {
+			adminInterface.Serve(adminPort)
+			close(adminWait)
+		}()
+
+		restWait := make(chan struct{})
+		go func() {
+			restHandler.Serve(restPort)
+			close(restWait)
+		}()
+
+		<-adminWait
+		<-restWait
 	}
