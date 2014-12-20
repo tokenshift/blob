@@ -17,7 +17,7 @@
 		"github.com/spaolacci/murmur3"
 	)
 
-Stores files and file metadata.
+The manifest stores files and file metadata.
 
 	type Manifest struct {
 		dbFile, storeDir string

@@ -6,6 +6,9 @@ Utility functions for working with environment variables.
 	package env
 
 	import (
+		"encoding/base32"
+		"encoding/base64"
+		"encoding/hex"
 		"os"
 		"strconv"
 		"strings"
@@ -104,4 +107,39 @@ example: HOSTS=localhost\:3000:example.com
 		}
 
 		return list
+	}
+
+Binary data can also be provided as environment variables using a specific
+encoding. Currently, base 16 (hexadecimal), 32, and 64 are supported. These
+functions return false if the specified value was not found, or true and an
+error if the value was found but could not be decoded.
+
+	func Get16(key string) ([]byte, bool, error) {
+		input, ok := Get(key)
+		if !ok {
+			return nil, false, nil
+		}
+
+		decoded, err := hex.DecodeString(input)
+		return decoded, true, err
+	}
+
+	func Get32(key string) ([]byte, bool, error) {
+		input, ok := Get(key)
+		if !ok {
+			return nil, false, nil
+		}
+
+		decoded, err := base32.StdEncoding.DecodeString(input)
+		return decoded, true, err
+	}
+
+	func Get64(key string) ([]byte, bool, error) {
+		input, ok := Get(key)
+		if !ok {
+			return nil, false, nil
+		}
+
+		decoded, err := base64.StdEncoding.DecodeString(input)
+		return decoded, true, err
 	}

@@ -30,18 +30,6 @@ environment variables.
 			os.Exit(1)
 		}
 
-		adminUsername, ok := env.Get("ADMIN_USERNAME")
-		if !ok {
-			log.Fatal("Missing $ADMIN_USERNAME")
-			os.Exit(1)
-		}
-
-		adminPasshash, ok := env.Get("ADMIN_PASSHASH")
-		if !ok {
-			log.Fatal("Missing $ADMIN_USERNAME")
-			os.Exit(1)
-		}
-
 		restPort, ok, err := env.GetInt("REST_PORT")
 		if !ok {
 			log.Fatal("Missing $REST_PORT")
@@ -49,6 +37,38 @@ environment variables.
 		}
 		if err != nil {
 			log.Fatal(err)
+			os.Exit(1)
+		}
+
+		adminUsername, ok := env.Get("ADMIN_USERNAME")
+		if !ok {
+			log.Fatal("Missing $ADMIN_USERNAME")
+			os.Exit(1)
+		}
+
+		adminSalt, ok, err := env.Get16("ADMIN_PASSWORD_SALT")
+		if !ok {
+			log.Fatal("Missing $ADMIN_PASSWORD_SALT")
+			os.Exit(1)
+		}
+		if err != nil {
+			log.Fatal("$ADMIN_PASSWORD_SALT must be hexadecimal")
+			os.Exit(1)
+		}
+
+		adminHash, ok, err := env.Get16("ADMIN_PASSWORD_HASH")
+		if !ok {
+			log.Fatal("Missing $ADMIN_PASSWORD_HASH")
+			os.Exit(1)
+		}
+		if err != nil {
+			log.Fatal("$ADMIN_PASSWORD_HASH must be hexadecimal")
+			os.Exit(1)
+		}
+
+		adminDbFile, ok := env.Get("ADMIN_DB_FILE")
+		if !ok {
+			log.Fatal("Missing $ADMIN_DB_FILE")
 			os.Exit(1)
 		}
 
@@ -73,7 +93,11 @@ initialized and started.
 
 		defer manifest.Close()
 
-		adminInterface := CreateAdminInterface(adminUsername, adminPasshash)
+		adminInterface, err := CreateAdminInterface(adminDbFile, adminUsername, adminSalt, adminHash)
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
 
 		restHandler := CreateRestHandler(manifest)
 
