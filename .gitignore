@@ -2,6 +2,9 @@
 blob
 blob.exe
 
+# Generated files
+*.go
+
 # Local Data
 data/
 *.jpg
