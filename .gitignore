@@ -1,0 +1,9 @@
+# Compiled executable
+blob
+blob.exe
+
+# Local Data
+data/
+*.jpg
+*.jpg.*
+*.sqlite3
