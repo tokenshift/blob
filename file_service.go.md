@@ -6,8 +6,8 @@
 		"net/http"
 		"sync"
 
-		"github.com/tokenshift/blob/env"
-		"github.com/tokenshift/blob/log"
+		"github.com/tokenshift/env"
+		"github.com/tokenshift/log"
 	)
 
 Responds to HTTP requests to store, update and retrieve files.
@@ -17,13 +17,7 @@ Responds to HTTP requests to store, update and retrieve files.
 	}
 
 	func NewFileService(fileStore FileStore, clientStore ClientStore) (FileService, error) {
-		port, ok, err := env.GetInt("BLOB_FILE_SERVICE_PORT")
-		if !ok {
-			return nil, fmt.Errorf("Missing $BLOB_FILE_SERVICE_PORT")
-		}
-		if err != nil {
-			return nil, fmt.Errorf("Invalid $BLOB_FILE_SERVICE_PORT")
-		}
+		port := env.MustGetInt("BLOB_FILE_SERVICE_PORT")
 
 		return httpFileService {
 			fileStore: fileStore,

@@ -12,8 +12,8 @@
 		"github.com/boltdb/bolt"
 		"github.com/spaolacci/murmur3"
 
-		"github.com/tokenshift/blob/env"
-		"github.com/tokenshift/blob/log"
+		"github.com/tokenshift/env"
+		"github.com/tokenshift/log"
 	)
 
 The FileStore stores files and file metadata.
@@ -25,15 +25,8 @@ The FileStore stores files and file metadata.
 	}
 
 	func NewFileStore() (FileStore, error) {
-		dbFile, ok := env.Get("BLOB_FILE_STORE_DB")
-		if !ok {
-			return nil, fmt.Errorf("Missing $BLOB_FILE_STORE_DB")
-		}
-
-		storeDir, ok := env.Get("BLOB_FILE_STORE_DIR")
-		if !ok {
-			return nil, fmt.Errorf("Missing $BLOB_FILE_STORE_DIR")
-		}
+		dbFile := env.MustGet("BLOB_FILE_STORE_DB")
+		storeDir := env.MustGet("BLOB_FILE_STORE_DIR")
 
 		fi, err := os.Stat(dbFile)
 		if err != nil && !os.IsNotExist(err) {

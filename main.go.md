@@ -5,7 +5,7 @@
 		"os"
 		"sync"
 
-		"github.com/tokenshift/blob/log"
+		"github.com/tokenshift/log"
 	)
 
 The main entry point for a Blob node. All settings are configured by
@@ -13,6 +13,13 @@ environment variables.
 
 	func main() {
 		var err error
+
+		defer func() {
+			if r := recover(); r != nil {
+				log.Fatal(r)
+				os.Exit(1)
+			}
+		}()
 
 Components are initialized one at a time in dependency order and then injected.
 

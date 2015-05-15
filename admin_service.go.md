@@ -6,8 +6,8 @@
 		"net/http"
 		"sync"
 
-		"github.com/tokenshift/blob/env"
-		"github.com/tokenshift/blob/log"
+		"github.com/tokenshift/env"
+		"github.com/tokenshift/log"
 	)
 
 The admin interface provides a mechanism for configuring a running Blob
@@ -18,13 +18,7 @@ instance.
 	}
 
 	func NewAdminService(clientStore ClientStore) (AdminService, error) {
-		port, ok, err := env.GetInt("BLOB_ADMIN_SERVICE_PORT")
-		if !ok {
-			return nil, fmt.Errorf("Missing $BLOB_ADMIN_SERVICE_PORT")
-		}
-		if err != nil {
-			return nil, fmt.Errorf("Invalid $BLOB_ADMIN_SERVICE_PORT")
-		}
+		port := env.MustGetInt("BLOB_ADMIN_SERVICE_PORT")
 
 		return httpAdminService {
 			clientStore: clientStore,
