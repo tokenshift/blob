@@ -9,3 +9,6 @@ blob.exe
 test*.txt
 db_*/
 db_*.bdb
+
+# GVPM/GVP dependencies
+.godeps
