@@ -1,0 +1,6 @@
+code.google.com/p/go-uuid/uuid  35bc42037350
+github.com/boltdb/bolt          2c04100eb9793f2b8541d243494e2909d2112325
+github.com/spaolacci/murmur3    9d87265e0948d305ffe0383d54e59c3ac3482454
+github.com/tokenshift/env       98aaaedbdf72776675d5a18a77ec0d8673d32e3c
+github.com/tokenshift/log       4d1fa599938234c7acf219a470c98d0810d7a7dd
+github.com/tokenshift/mdweb     5068b4f8128724d48b6a950d259b1fb5093646d5

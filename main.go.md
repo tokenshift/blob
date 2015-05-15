@@ -1,83 +1,52 @@
-# Blob
-
 	<<#-->>
 	package main
 
 	import (
 		"os"
+		"sync"
 
-		"github.com/tokenshift/blob/env"
-		"github.com/tokenshift/blob/log"
-
-		. "github.com/tokenshift/blob/admin"
-		. "github.com/tokenshift/blob/manifest"
-		. "github.com/tokenshift/blob/rest"
+		"github.com/tokenshift/log"
 	)
 
-The main entry point for a **Blob** node. All settings are configured by
+The main entry point for a Blob node. All settings are configured by
 environment variables.
 
 	func main() {
-		dbFile, ok := env.Get("MANIFEST_DB_FILE")
-		if !ok {
-			log.Fatal("Missing $MANIFEST_DB_FILE")
-			os.Exit(1)
-		}
+		var err error
 
-		storeDir, ok := env.Get("MANIFEST_STORE_DIR")
-		if !ok {
-			log.Fatal("Missing $MANIFEST_STORE_DIR")
-			os.Exit(1)
-		}
+		defer func() {
+			if r := recover(); r != nil {
+				log.Fatal(r)
+				os.Exit(1)
+			}
+		}()
 
-		restPort, ok, err := env.GetInt("REST_PORT")
-		if !ok {
-			log.Fatal("Missing $REST_PORT")
-			os.Exit(1)
-		}
+Components are initialized one at a time in dependency order and then injected.
+
+		fileStore, err := NewFileStore()
 		if err != nil {
+			log.Fatal("Failed to initialize file store")
 			log.Fatal(err)
 			os.Exit(1)
 		}
 
-		adminUsername, ok := env.Get("ADMIN_USERNAME")
-		if !ok {
-			log.Fatal("Missing $ADMIN_USERNAME")
-			os.Exit(1)
-		}
-
-		adminSalt, ok, err := env.Get16("ADMIN_PASSWORD_SALT")
-		if !ok {
-			log.Fatal("Missing $ADMIN_PASSWORD_SALT")
-			os.Exit(1)
-		}
+		clientStore, err := NewClientStore()
 		if err != nil {
-			log.Fatal("$ADMIN_PASSWORD_SALT must be hexadecimal")
+			log.Fatal("Failed to initialize client store")
+			log.Fatal(err)
 			os.Exit(1)
 		}
 
-		adminHash, ok, err := env.Get16("ADMIN_PASSWORD_HASH")
-		if !ok {
-			log.Fatal("Missing $ADMIN_PASSWORD_HASH")
-			os.Exit(1)
-		}
+		fileService, err := NewFileService(fileStore, clientStore)
 		if err != nil {
-			log.Fatal("$ADMIN_PASSWORD_HASH must be hexadecimal")
+			log.Fatal("Failed to initialize file service")
+			log.Fatal(err)
 			os.Exit(1)
 		}
 
-		adminDbFile, ok := env.Get("ADMIN_DB_FILE")
-		if !ok {
-			log.Fatal("Missing $ADMIN_DB_FILE")
-			os.Exit(1)
-		}
-
-		adminPort, ok, err := env.GetInt("ADMIN_PORT")
-		if !ok {
-			log.Fatal("Missing $ADMIN_PORT")
-			os.Exit(1)
-		}
+		adminService, err := NewAdminService(clientStore)
 		if err != nil {
+			log.Fatal("Failed to initialize admin service")
 			log.Fatal(err)
 			os.Exit(1)
 		}
@@ -85,34 +54,9 @@ environment variables.
 Once all settings have been validated, the individual components are
 initialized and started.
 
-		manifest, err := CreateManifest(dbFile, storeDir)
-		if err != nil {
-			log.Fatal(err)
-			os.Exit(1)
-		}
-
-		defer manifest.Close()
-
-		adminInterface, err := CreateAdminInterface(adminDbFile, adminUsername, adminSalt, adminHash)
-		if err != nil {
-			log.Fatal(err)
-			os.Exit(1)
-		}
-
-		restHandler := CreateRestHandler(manifest)
-
-		adminWait := make(chan struct{})
-		go func() {
-			adminInterface.Serve(adminPort)
-			close(adminWait)
-		}()
-
-		restWait := make(chan struct{})
-		go func() {
-			restHandler.Serve(restPort)
-			close(restWait)
-		}()
-
-		<-adminWait
-		<-restWait
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go fileService.Start(&wg)
+		go adminService.Start(&wg)
+		wg.Wait()
 	}

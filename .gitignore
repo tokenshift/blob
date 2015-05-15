@@ -2,11 +2,13 @@
 blob
 blob.exe
 
-# Generated code
+# Generated files
 *.go
 
-# Local Data
-data/
-*.jpg
-*.jpg.*
-*.sqlite3
+# Local/test data
+test*.txt
+db_*/
+db_*.bdb
+
+# GVPM/GVP dependencies
+.godeps
