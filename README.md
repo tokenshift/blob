@@ -58,29 +58,29 @@ is used as the filename. No additional validation of the path is performed, so
 client applications can implement their own folder structure/namespacing of
 files as needed.
 
-* **GET**
+* **GET**  
   Retrieves an existing file.
-  * _200_
+  * _200_  
     File exists, returned in body of response.
-  * _404_
+  * _404_  
     File not found.
-* **HEAD**
+* **HEAD**  
   Retrieves file metadata.
-  * _200_
+  * _200_  
   File exists; only the file metadata will be returned (in response headers).
-  * _404_
+  * _404_  
   File not found.
-* **PUT**
+* **PUT**  
   Uploads a new file or updates an existing one.
-  * _201_
+  * _201_  
     Uploaded a new file.
-  * _200_
+  * _200_  
     Updated an existing file.
-* **DELETE**
+* **DELETE**  
   Deletes an existing file.
-  * _200_
+  * _200_  
     File was deleted.
-  * _404_
+  * _404_  
     File not found.
 
 TODO: Content-Type, ETag, caching
@@ -91,16 +91,16 @@ TODO
 
 ### Options
 
-* **$BLOB_FILE_SERVICE_PORT**
+* **$BLOB_FILE_SERVICE_PORT**  
   The port that the main file service will run on.
-* **$BLOB_ADMIN_SERVICE_PORT**
+* **$BLOB_ADMIN_SERVICE_PORT**  
   The port that the admin/config interface will run on.
-* **$BLOB_ADMIN_SERVICE_USERNAME**
+* **$BLOB_ADMIN_SERVICE_USERNAME**  
   Username for accessing the admin service (using HTTP basic auth).
-* **$BLOB_ADMIN_SERVICE_PASSWORD**
+* **$BLOB_ADMIN_SERVICE_PASSWORD**  
   Password for accessing the admin service (using HTTP basic auth).
-* **$BLOB_FILE_STORE_DB**
+* **$BLOB_FILE_STORE_DB**  
   Filename for the file metadata db. Will be created if it does not already
   exist.
-* **$BLOB_FILE_STORE_DIR**
+* **$BLOB_FILE_STORE_DIR**  
   Folder where uploaded files will be stored.
