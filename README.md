@@ -56,7 +56,8 @@ a single node.
 The file service responds to HTTP requests as follows, where the provided path
 is used as the filename. No additional validation of the path is performed, so
 client applications can implement their own folder structure/namespacing of
-files as needed.
+files as needed. (This is safe, because Blob stores the files at paths based on
+an ID generated internally, with the filename stored as part of the metadata.)
 
 * **GET**  
   Retrieves an existing file.
