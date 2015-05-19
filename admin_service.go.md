@@ -19,11 +19,15 @@ instance.
 	}
 
 	func NewAdminService(clientStore ClientStore) (AdminService, error) {
-		port := env.MustGetInt("BLOB_ADMIN_SERVICE_PORT")
+		port     := env.MustGetInt("BLOB_ADMIN_SERVICE_PORT")
+		username := env.MustGet("BLOB_ADMIN_SERVICE_USERNAME")
+		passhash := env.MustGet("BLOB_ADMIN_SERVICE_PASSHASH")
 
 		svc := httpAdminService {
 			clientStore: clientStore,
 			port: port,
+			username: username,
+			passhash: passhash,
 		}
 
 		svc.makeRoutes()
