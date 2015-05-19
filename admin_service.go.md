@@ -2,6 +2,7 @@
 	package main
 
 	import (
+		"crypto/sha256"
 		"fmt"
 		"net/http"
 		"sync"
@@ -36,19 +37,46 @@ instance.
 	}
 
 The admin service will run as a REST service on a different port to the "main"
-file service.
+file service. All requests to this service are authenticated using HTTP basic
+auth, with a username and password hash provided as environment variables.
 
 	type httpAdminService struct {
 		clientStore ClientStore
 		mux http.Handler
 		port int
+		username, passhash string
 	}
 
 	func (svc httpAdminService) Start(wait *sync.WaitGroup) {
 		log.Info("Starting admin service on port", svc.port)
-		http.ListenAndServe(fmt.Sprintf(":%d", svc.port), svc.mux)
+		http.ListenAndServe(fmt.Sprintf(":%d", svc.port), svc)
 		log.Info("Stopping admin service.")
 		wait.Done()
+	}
+
+	func (svc httpAdminService) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+		if username, password, ok := req.BasicAuth(); ok {
+			if (username == svc.username && Hash(password) == svc.passhash) {
+				svc.mux.ServeHTTP(res, req)
+			} else {
+				// 403; invalid username/password.
+				res.WriteHeader(403)
+				res.Write([]byte("Invalid username/password\n"))
+			}
+		} else {
+			// 401; authentication required.
+			res.WriteHeader(401)
+			res.Write([]byte("Authentication required\n"))
+		}
+	}
+
+For convenience, the admin service provides its own hash function (the same as
+is exposed by the github.com/tokenshift/blob/hash command-line utility) to use
+when veriying the service credentials.
+
+	func Hash(password string) string {
+		h := sha256.Sum256([]byte(password))
+		return fmt.Sprintf("%x", h)
 	}
 
 Route definitions for the admin service. The service uses [Pat](https://github.com/bmizerany/pat)
@@ -70,7 +98,7 @@ or delete clients (PUT and DELETE).
 
 		if password == "" {
 			res.WriteHeader(400)
-			res.Write([]byte("Password is required"))
+			res.Write([]byte("Password is required\n"))
 			return
 		}
 
@@ -78,7 +106,7 @@ or delete clients (PUT and DELETE).
 		if err != nil {
 			log.Error(err)
 			res.WriteHeader(500)
-			res.Write([]byte("An unknown error occurred."))
+			res.Write([]byte("An unknown error occurred.\n"))
 			return
 		}
 
@@ -96,7 +124,7 @@ or delete clients (PUT and DELETE).
 		if err != nil {
 			log.Error(err)
 			res.WriteHeader(500)
-			res.Write([]byte("An unknown error occurred."))
+			res.Write([]byte("An unknown error occurred.\n"))
 			return
 		}
 
@@ -104,6 +132,6 @@ or delete clients (PUT and DELETE).
 			res.WriteHeader(200)
 		} else {
 			res.WriteHeader(404)
-			res.Write([]byte("User not found."))
+			res.Write([]byte("User not found.\n"))
 		}
 	}
