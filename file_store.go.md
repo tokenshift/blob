@@ -19,9 +19,9 @@
 The FileStore stores files and file metadata.
 
 	type FileStore interface {
-		DeleteFile(path string) (bool, error)
-		GetFile(path string) (bool, Handle)
-		SaveFile(path, mimeType string, body io.Reader) (bool, error)
+		DeleteFile(client, path string) (bool, error)
+		GetFile(client, path string) (bool, Handle, error)
+		SaveFile(client, path, mimeType string, body io.Reader) (bool, error)
 	}
 
 	func NewFileStore() (FileStore, error) {
@@ -49,11 +49,6 @@ The FileStore stores files and file metadata.
 			return nil, err
 		}
 
-		db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
-			return err
-		})
-
 		return localFileStore {
 			dbFile: dbFile,
 			storeDir: storeDir,
@@ -68,69 +63,64 @@ the same time as it is being read; the update will write data to a new file
 (with a different UUID), with the manifest only being updated once the write is
 complete.
 
-File metadata is stored in a Bolt DB. The filename itself is is used as a key
-where an internal ID for the file (a UUID) is saved. While the same filename
-may refer to multiple versions of a file (a GET request will retrieve whatever
-the latest version happens to be), the ID refers to a specific version. The ID
-also becomes part of the file location on disk.
+File metadata is stored in a BoltDB instance, with keys based on the filename.
+The keys used are:
 
-All other file metadata is stored at keys consisting of the ID with an
-additional suffix of the name of the metadata field (e.g. {id}size).
+* `{filename}:id`  
+  The UUID for the file on disk.
+  This is kept instead of the full file path, so that the file store can be
+  moved transparently to the Blob node.
+* `{filename}:hash`  
+  The hash of the file. This is computed as the file is saved to disk and saved
+  as metadata.
+* `{filename}:size`  
+  The size (in bytes) of the file. Also computed as the file is saved to disk.
+* `{filename}:mimeType`  
+  The MIME type of the file, if known. This will usually be the Content-Type
+  header from the request that provided the file.
+
+Files for each client are stored in their own BoltDB bucket.
 
 	type localFileStore struct {
 		dbFile, storeDir string
 		db *bolt.DB
 	}
 
-	var bucketName = []byte("Files")
-
-	func bucketKey(id []byte, key string) []byte {
-		// Not sure why a copy is needed here; if I try to append to `id`
-		// directly, I'm getting runtime panics from memmove_amd64.s.
-		result := make([]byte, len(id), len(id) + len(key))
-		copy(result, id)
-		result = append(result, []byte(key)...)
-		return result
+	func bucketKey(filename string, field string) []byte {
+		return []byte(filename + ":" + field)
 	}
 
 GetFile returns true if the file exists, and provides a handle to the file
 metadata (that can also be used to access the file data).
 
-	func (store localFileStore) GetFile(fname string) (bool, Handle) {
+	func (store localFileStore) GetFile(client, fname string) (bool, Handle, error) {
 		exists := false
 		handle := localFileStoreEntry{}
 
-		store.db.View(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(bucketName))
-			id := b.Get([]byte(fname))
-
-			exists = id != nil
-			if !exists {
+		err := store.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(client))
+			if b == nil {
 				return nil
 			}
 
-			handle.id = id
-			handle.path = filepath.Join(store.storeDir, uuid.UUID(id).String())
-
-			size := b.Get(bucketKey(id, "size"))
-			if size != nil {
-				handle.size, _ = binary.Varint(size)
+			handle.id = b.Get(bucketKey(fname, "id"))
+			if handle.id == nil {
+				return nil
 			}
 
-			mimeType := b.Get(bucketKey(id, "mime"))
-			if mimeType != nil {
-				handle.mimeType = string(mimeType)
-			}
+			exists = true
+			handle.path     = filepath.Join(store.storeDir, uuid.UUID(handle.id).String())
 
-			hash := b.Get(bucketKey(id, "hash"))
-			if hash != nil {
-				handle.hash = hash
-			}
+			handle.hash     = b.Get(bucketKey(fname, "hash"))
+			handle.mimeType = string(b.Get(bucketKey(fname, "mimeType")))
+
+			size := b.Get(bucketKey(fname, "size"))
+			handle.size, _ = binary.Varint(size)
 
 			return nil
 		})
 
-		return exists, handle
+		return exists, handle, err
 	}
 
 	type Handle interface {
@@ -176,7 +166,7 @@ metadata (that can also be used to access the file data).
 SaveFile returns true if the file was newly created, or false if it already
 existed (and was updated).
 
-	func (store localFileStore) SaveFile(fname, mimeType string, data io.Reader) (bool, error) {
+	func (store localFileStore) SaveFile(client, fname, mimeType string, data io.Reader) (bool, error) {
 		id := uuid.NewRandom()
 		path := filepath.Join(store.storeDir, id.String())
 
@@ -188,7 +178,8 @@ existed (and was updated).
 		}
 		defer file.Close()
 
-The input data is tee'd to a rolling hash and the file on disk. The hash and the file size are both recorded as metadata.
+The input data is tee'd to a rolling hash and the file on disk. The hash and
+the file size are both recorded as metadata.
 
 		hash := murmur3.New128()
 		input := io.TeeReader(data, hash)
@@ -198,31 +189,41 @@ The input data is tee'd to a rolling hash and the file on disk. The hash and the
 			return false, err
 		}
 
+		log.Debug("Saved", fname, "as", id, "at", path, "-", size, "bytes")
+
 		var isNew bool
 
 		store.db.Update(func(tx *bolt.Tx) error {
 			sizeBuf := make([]byte, 8)
 			binary.PutVarint(sizeBuf, size)
 
-			b := tx.Bucket([]byte(bucketName))
-			isNew = b.Get([]byte(fname)) == nil
-
-			err = b.Put([]byte(fname), id)
+			b, err := tx.CreateBucketIfNotExists([]byte(client))
 			if err != nil {
 				return err
 			}
 
-			err = b.Put(bucketKey(id, "size"), sizeBuf)
+			isNew = b.Get(bucketKey(fname, "id")) == nil
+
+			err = b.Put(bucketKey(fname, "id"), id)
 			if err != nil {
 				return err
 			}
 
-			err = b.Put(bucketKey(id, "hash"), hash.Sum(nil))
+			err = b.Put(bucketKey(fname, "size"), sizeBuf)
 			if err != nil {
 				return err
 			}
 
-			err = b.Put(bucketKey(id, "mime"), []byte(mimeType))
+			// BUG: github.com/spaolacci/murmur3 claims to have a block size of
+			// 1, but returns an all-zero sum if provided any less than 16
+			// bytes. Need to replace with a different hash or better
+			// implementation, or pad the input to match the "real" block size.
+			err = b.Put(bucketKey(fname, "hash"), hash.Sum(nil))
+			if err != nil {
+				return err
+			}
+
+			err = b.Put(bucketKey(fname, "mimeType"), []byte(mimeType))
 			return err
 		})
 
@@ -231,19 +232,21 @@ The input data is tee'd to a rolling hash and the file on disk. The hash and the
 
 DeleteFile returns true if the file existed and was removed.
 
-	func (store localFileStore) DeleteFile(fname string) (bool, error) {
-		var err error
-		var exists bool
+	func (store localFileStore) DeleteFile(client, fname string) (bool, error) {
+		exists := false
 
-		store.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(bucketName))
-
-			exists = b.Get([]byte(fname)) != nil
-			if exists {
-				err = b.Delete([]byte(fname))
+		err := store.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(client))
+			if b == nil {
+				return nil
 			}
 
-			return err
+			exists = b.Get(bucketKey(fname, "id")) != nil
+			if exists {
+				return b.Delete([]byte(fname))
+			} else {
+				return nil
+			}
 		})
 
 		return exists, err

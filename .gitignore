@@ -1,6 +1,8 @@
 # Compiled executable
 blob
 blob.exe
+hash/hash
+hash/hash.exe
 
 # Generated files
 *.go
