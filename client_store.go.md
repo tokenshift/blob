@@ -12,6 +12,7 @@ The client store stores client/user information, hashing user passwords that
 can then be used to validate the provided credentials.
 
 	type ClientStore interface {
+		GetUsers() ([]string, error)
 		SaveUser(username, password string) (bool, error)
 		DeleteUser(username string) (bool, error)
 		VerifyUser(username, password string) (bool, error)
@@ -28,6 +29,16 @@ The standard implementation stores (hashed) user credentials in a local Bolt DB.
 
 	type boltClientStore struct {
 		hashes map[string][]byte
+	}
+
+	func (store *boltClientStore) GetUsers() ([]string, error) {
+		users := make([]string, 0, len(store.hashes))
+
+		for user := range store.hashes {
+			users = append(users, user)
+		}
+
+		return users, nil
 	}
 
 	func (store *boltClientStore) SaveUser(username, password string) (bool, error) {

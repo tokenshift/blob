@@ -86,10 +86,26 @@ or delete clients (PUT and DELETE).
 	func (svc *httpAdminService) makeRoutes() {
 		mux := pat.New()
 
+		mux.Get("/clients", http.HandlerFunc(svc.getClients))
 		mux.Put("/clients/:username", http.HandlerFunc(svc.putClient))
 		mux.Del("/clients/:username", http.HandlerFunc(svc.deleteClient))
 
 		svc.mux = mux
+	}
+
+	func (svc httpAdminService) getClients(res http.ResponseWriter, req *http.Request) {
+		users, err := svc.clientStore.GetUsers()
+		if err != nil {
+			log.Error(err)
+			res.WriteHeader(500)
+			res.Write([]byte("An unknown error occurred.\n"))
+			return
+		}
+
+		res.WriteHeader(200)
+		for _, user := range(users) {
+			fmt.Fprintln(res, user)
+		}
 	}
 
 	func (svc httpAdminService) putClient(res http.ResponseWriter, req *http.Request) {
