@@ -37,14 +37,16 @@ Components are initialized one at a time in dependency order and then injected.
 			os.Exit(1)
 		}
 
-		fileService, err := NewFileService(fileStore, clientStore)
+		siblings := NewSiblingStore()
+
+		fileService, err := NewFileService(fileStore, clientStore, siblings)
 		if err != nil {
 			log.Fatal("Failed to initialize file service")
 			log.Fatal(err)
 			os.Exit(1)
 		}
 
-		adminService, err := NewAdminService(clientStore)
+		adminService, err := NewAdminService(clientStore, siblings)
 		if err != nil {
 			log.Fatal("Failed to initialize admin service")
 			log.Fatal(err)

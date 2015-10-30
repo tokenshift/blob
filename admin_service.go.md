@@ -6,6 +6,7 @@
 		"fmt"
 		"net/http"
 		"sync"
+		"time"
 
 		"github.com/bmizerany/pat"
 		"github.com/tokenshift/env"
@@ -19,13 +20,14 @@ instance.
 		Start(*sync.WaitGroup)
 	}
 
-	func NewAdminService(clientStore ClientStore) (AdminService, error) {
+	func NewAdminService(clientStore ClientStore, siblings Siblings) (AdminService, error) {
 		port     := env.MustGetInt("BLOB_ADMIN_SERVICE_PORT")
 		username := env.MustGet("BLOB_ADMIN_SERVICE_USERNAME")
 		passhash := env.MustGet("BLOB_ADMIN_SERVICE_PASSHASH")
 
 		svc := httpAdminService {
 			clientStore: clientStore,
+			siblings: siblings,
 			port: port,
 			username: username,
 			passhash: passhash,
@@ -42,6 +44,7 @@ auth, with a username and password hash provided as environment variables.
 
 	type httpAdminService struct {
 		clientStore ClientStore
+		siblings Siblings
 		mux http.Handler
 		port int
 		username, passhash string
@@ -80,8 +83,10 @@ when veriying the service credentials.
 	}
 
 Route definitions for the admin service. The service uses [Pat](https://github.com/bmizerany/pat)
-for route multiplexing. Currently, the only routes supported are to add/update
-or delete clients (PUT and DELETE).
+for route multiplexing.
+
+The admin interface supports dynamically adding client applications (/clients)
+and siblings (/siblings) to the running node.
 
 	func (svc *httpAdminService) makeRoutes() {
 		mux := pat.New()
@@ -89,6 +94,10 @@ or delete clients (PUT and DELETE).
 		mux.Get("/clients", http.HandlerFunc(svc.getClients))
 		mux.Put("/clients/:username", http.HandlerFunc(svc.putClient))
 		mux.Del("/clients/:username", http.HandlerFunc(svc.deleteClient))
+
+		mux.Get("/siblings", http.HandlerFunc(svc.getSiblings))
+		mux.Get("/siblings/:uri", http.HandlerFunc(svc.getSibling))
+		mux.Post("/siblings", http.HandlerFunc(svc.addSibling))
 
 		svc.mux = mux
 	}
@@ -150,4 +159,59 @@ or delete clients (PUT and DELETE).
 			res.WriteHeader(404)
 			res.Write([]byte("User not found.\n"))
 		}
+	}
+
+	func (svc httpAdminService) getSiblings(res http.ResponseWriter, req *http.Request) {
+		siblings := svc.siblings.All()
+
+		res.WriteHeader(200)
+		for _, sibling := range(siblings) {
+			fmt.Fprintln(res, sibling.URI)
+			fmt.Fprintln(res, "Introduced:  ", sibling.Introduced.Format(time.RFC3339))
+			fmt.Fprintln(res, "Last Contact:", sibling.LastContact.Format(time.RFC3339))
+			fmt.Fprintln(res, "Estranged:   ", sibling.Estranged)
+			fmt.Fprintln(res, "")
+		}
+	}
+
+	func (svc httpAdminService) getSibling(res http.ResponseWriter, req *http.Request) {
+		uri := req.URL.Query().Get(":uri")
+		sibling, ok := svc.siblings.Status(uri)
+
+		if ok {
+			res.WriteHeader(200)
+			fmt.Fprintln(res, sibling.URI)
+			fmt.Fprintln(res, "Introduced:  ", sibling.Introduced.Format(time.RFC3339))
+			fmt.Fprintln(res, "Last Contact:", sibling.LastContact.Format(time.RFC3339))
+			fmt.Fprintln(res, "Estranged:   ", sibling.Estranged)
+			fmt.Fprintln(res, "")
+		} else {
+			res.WriteHeader(404)
+			fmt.Fprintln(res, "Sibling not found:", uri)
+		}
+	}
+
+	func (svc httpAdminService) addSibling(res http.ResponseWriter, req *http.Request) {
+		uri := req.FormValue("uri")
+
+		if uri == "" {
+			res.WriteHeader(400)
+			res.Write([]byte("URI is required\n"))
+			return
+		}
+
+		status, err := svc.siblings.Add(uri)
+		if err != nil {
+			log.Error(err)
+			res.WriteHeader(500)
+			res.Write([]byte("An unknown error occurred.\n"))
+			return
+		}
+
+		res.WriteHeader(200)
+		fmt.Fprintln(res, status.URI)
+		fmt.Fprintln(res, "Introduced:  ", status.Introduced.Format(time.RFC3339Nano))
+		fmt.Fprintln(res, "Last Contact:", status.LastContact.Format(time.RFC3339Nano))
+		fmt.Fprintln(res, "Estranged:   ", status.Estranged)
+		fmt.Fprintln(res, "")
 	}

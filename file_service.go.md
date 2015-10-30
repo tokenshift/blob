@@ -16,11 +16,12 @@ Responds to HTTP requests to store, update and retrieve files.
 		Start(*sync.WaitGroup)
 	}
 
-	func NewFileService(fileStore FileStore, clientStore ClientStore) (FileService, error) {
+	func NewFileService(fileStore FileStore, clientStore ClientStore, siblings Siblings) (FileService, error) {
 		port := env.MustGetInt("BLOB_FILE_SERVICE_PORT")
 
 		return httpFileService {
 			clientStore: clientStore,
+			siblings: siblings,
 			fileStore: fileStore,
 			port: port,
 		}, nil
@@ -30,6 +31,7 @@ The HTTP service handles GET, PUT, and DELETE requests to update and retrieve fi
 
 	type httpFileService struct {
 		clientStore ClientStore
+		siblings Siblings
 		fileStore FileStore
 		port int
 	}
